@@ -14,6 +14,11 @@ export default new Command({
         }
     ],
     async run({ interaction, options }) {
+
+        if (!interaction.isChatInputCommand() || !interaction.inCachedGuild()) return;
+
+        interaction.deferReply();
+
         if (!interaction.isChatInputCommand() || !interaction.inCachedGuild()) return;
 
         const amount = options.getInteger("quantidade", true);

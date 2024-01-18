@@ -33,44 +33,63 @@ export default new Command({
         const reason = options.getString('reason', false);
         const votes = options.getInteger('votes', true);
 
+        if (!interaction.isChatInputCommand() || !interaction.inCachedGuild()) return;
+
         let totalVotes = 0;
 
-        const response = `Voteban started for ${user} with reason: ${reason} and ${votes} votes needed`;
+        let response = '';
 
         const reactions = ['✅', '❌'];
 
-        interaction.reply({
-            content: response
-        });
-        const message = await interaction.channel?.send({
-            content: response
-        });
+        if (userContext?.permissions.has('Administrator')) {
 
-        for (const reaction of reactions) {
-            await message?.react(reaction);
+            response = `Voteban started for ${user} with reason: ${reason} and ${votes} votes needed to ban.`;
+
+            interaction.reply({
+                content: response
+            });
+
+            const message = await interaction.channel?.send({
+                content: response
+            });
+
+            for (const reaction of reactions) {
+                await message?.react(reaction);
+            }
+
+            const filter = (reaction: MessageReaction, user: User) =>
+                reactions.includes(reaction.emoji.name || '') && user.id !== interaction.user.id;
+
+            const collector = message?.createReactionCollector({ filter, time: 60000 });
+
+            collector?.on('collect', (reaction, user) => {
+                if (reaction.emoji.name === '✅') {
+                    totalVotes++;
+                    interaction.editReply({ content: `Total votes: ${totalVotes}` });
+                }
+            });
+
+            collector?.on('end', () => {
+                if (totalVotes >= votes) {
+                    interaction.followUp({
+                        content: `Voteban passed, ${user.tag} has been banned for: ${reason || 'No reason provided'}`,
+                    });
+                    if (userContext?.bannable) {
+                        userContext?.ban({ reason: reason || 'No reason provided' });
+                    }
+                } else {
+                    interaction.followUp({ content: 'Voteban failed, not enough votes.' });
+                }
+            });
+
+        } else {
+
+            response = `not enought permissions!`;
+
+            interaction.reply({
+                content: response
+            });
+
         }
-
-        const filter = (reaction: MessageReaction, user: User) =>
-            reactions.includes(reaction.emoji.name || '') && user.id !== interaction.user.id;
-
-        const collector = message?.createReactionCollector({ filter, time: 60000 });
-
-        collector?.on('collect', (reaction, user) => {
-            if (reaction.emoji.name === '✅') {
-                totalVotes++;
-                interaction.followUp({ content: `Total votes: ${totalVotes}` });
-            }
-        });
-
-        collector?.on('end', () => {
-            if (totalVotes >= votes) {
-                interaction.followUp({
-                    content: `Voteban passed, ${user.tag} has been banned for: ${reason || 'No reason provided'}`,
-                });
-                userContext?.ban({ reason: reason || 'No reason provided' });
-            } else {
-                interaction.followUp({ content: 'Voteban failed, not enough votes.' });
-            }
-        });
     },
 });
